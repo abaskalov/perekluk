@@ -4,3 +4,4 @@
 *.dmg
 .DS_Store
 AppIcon.iconset/
+generate_icon.py
