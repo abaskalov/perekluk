@@ -3,5 +3,5 @@
 *.app/
 *.dmg
 .DS_Store
+.ruff_cache/
 AppIcon.iconset/
-generate_icon.py
