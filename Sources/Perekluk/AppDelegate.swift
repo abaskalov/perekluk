@@ -109,10 +109,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Buffer Switch
 
     private func handleBufferSwitch(_ buffer: [KeyStroke]) {
-        guard let otherSource = inputSourceManager.getOtherSource(),
-              let layoutData = inputSourceManager.getLayoutData(for: otherSource) else {
+        guard let currentSource = inputSourceManager.getCurrentSource(),
+              let otherSource = inputSourceManager.getOtherSource(),
+              let otherLayout = inputSourceManager.getLayoutData(for: otherSource) else {
             return
         }
+
+        let currentLayout = inputSourceManager.getLayoutData(for: currentSource)
 
         var newText = ""
         for stroke in buffer {
@@ -120,16 +123,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 stroke.keyCode,
                 shift: stroke.shift,
                 capsLock: stroke.capsLock,
-                layoutData: layoutData
+                layoutData: otherLayout
             ) {
                 newText += char
+            } else if let currentLayout,
+                      let original = inputSourceManager.translateKeyCode(
+                stroke.keyCode,
+                shift: stroke.shift,
+                capsLock: stroke.capsLock,
+                layoutData: currentLayout
+            ) {
+                newText += original
             }
         }
 
         guard !newText.isEmpty else { return }
 
-        textReplacer.replaceText(deleteCount: buffer.count, newText: newText)
-        inputSourceManager.select(otherSource)
+        textReplacer.replaceText(deleteCount: buffer.count, newText: newText) { [self] in
+            inputSourceManager.select(otherSource)
+        }
     }
 
     // MARK: - Selection Switch

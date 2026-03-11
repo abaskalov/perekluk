@@ -56,6 +56,7 @@ final class KeyboardMonitor {
         }
 
         if flags.contains(.maskCommand) || flags.contains(.maskControl) {
+            clearBuffer()
             return
         }
 
@@ -72,8 +73,10 @@ final class KeyboardMonitor {
             return
         }
 
-        // keyCodes 0..50 are printable characters on standard layouts
-        guard keyCode <= 50 else { return }
+        guard keyCode <= 50 else {
+            clearBuffer()
+            return
+        }
 
         let shift = flags.contains(.maskShift)
         let capsLock = flags.contains(.maskAlphaShift)
