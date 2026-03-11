@@ -8,33 +8,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let textReplacer = TextReplacer()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        guard checkAccessibility() else { return }
-        setupStatusItem()
-        setupKeyboardMonitor()
-        observeInputSourceChanges()
-        updateStatusItemTitle()
+        if AXIsProcessTrusted() {
+            startApp()
+        } else {
+            requestAccessibilityAndWait()
+        }
     }
 
     // MARK: - Accessibility
 
-    private func checkAccessibility() -> Bool {
+    private func requestAccessibilityAndWait() {
         let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true]
-        let trusted = AXIsProcessTrustedWithOptions(options as CFDictionary)
-        if !trusted {
-            let alert = NSAlert()
-            alert.messageText = "Perekluk needs Accessibility access"
-            alert.informativeText = "Open System Settings → Privacy & Security → Accessibility and enable Perekluk. Then relaunch the app."
-            alert.alertStyle = .warning
-            alert.addButton(withTitle: "Open Settings")
-            alert.addButton(withTitle: "Quit")
-            let response = alert.runModal()
-            if response == .alertFirstButtonReturn {
-                NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
+        AXIsProcessTrustedWithOptions(options as CFDictionary)
+
+        Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] timer in
+            if AXIsProcessTrusted() {
+                timer.invalidate()
+                self?.startApp()
             }
-            NSApp.terminate(nil)
-            return false
         }
-        return true
+    }
+
+    private func startApp() {
+        setupStatusItem()
+        setupKeyboardMonitor()
+        observeInputSourceChanges()
+        updateStatusItemTitle()
     }
 
     // MARK: - Status Bar
