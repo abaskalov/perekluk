@@ -20,6 +20,14 @@ Free and open-source alternative to Caramba Switcher and Punto Switcher.
 
 Download **Perekluk.dmg** from [Releases](../../releases/latest), open it, drag `Perekluk.app` to Applications.
 
+If macOS says the app is "damaged", run in Terminal:
+
+```bash
+xattr -cr /Applications/Perekluk.app
+```
+
+The app is not signed with an Apple Developer certificate — this command removes the quarantine flag.
+
 ### Build from source
 
 ```bash
@@ -76,6 +84,12 @@ Perekluk uses a global keyboard event tap to buffer keystrokes. When you press O
 ### Установка
 
 Скачайте **Perekluk.dmg** из [Releases](../../releases/latest), откройте и перетащите `Perekluk.app` в Программы.
+
+Если macOS пишет что приложение «повреждено», выполните в Терминале:
+
+```bash
+xattr -cr /Applications/Perekluk.app
+```
 
 ### Настройка
 
