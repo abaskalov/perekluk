@@ -1,0 +1,6 @@
+.build/
+.swiftpm/
+*.app/
+*.dmg
+.DS_Store
+AppIcon.iconset/
