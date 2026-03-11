@@ -165,20 +165,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let pasteboard = NSPasteboard.general
         let savedContent = pasteboard.string(forType: .string)
 
-        textReplacer.deleteChars(count: buffer.count)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [self] in
+            textReplacer.deleteChars(count: buffer.count)
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.03) { [self] in
-            pasteboard.clearContents()
-            pasteboard.setString(newText, forType: .string)
-            textReplacer.sendPaste()
-            inputSourceManager.select(otherSource)
-
-            let restoreChangeCount = pasteboard.changeCount
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                guard pasteboard.changeCount == restoreChangeCount else { return }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [self] in
                 pasteboard.clearContents()
-                if let saved = savedContent {
-                    pasteboard.setString(saved, forType: .string)
+                pasteboard.setString(newText, forType: .string)
+                textReplacer.sendPaste()
+                inputSourceManager.select(otherSource)
+
+                let restoreChangeCount = pasteboard.changeCount
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    guard pasteboard.changeCount == restoreChangeCount else { return }
+                    pasteboard.clearContents()
+                    if let saved = savedContent {
+                        pasteboard.setString(saved, forType: .string)
+                    }
                 }
             }
         }

@@ -12,9 +12,23 @@ final class TextReplacer {
 
     func deleteChars(count: Int) {
         for _ in 0..<count {
-            postKey(code: 51, keyDown: true)  // 51 = Backspace
-            postKey(code: 51, keyDown: false)
+            postBackspace()
         }
+    }
+
+    private func postBackspace() {
+        guard let down = CGEvent(keyboardEventSource: eventSource, virtualKey: 51, keyDown: true),
+              let up = CGEvent(keyboardEventSource: eventSource, virtualKey: 51, keyDown: false) else { return }
+        // Explicit DEL character — terminals need the unicode string to know
+        // what byte to send to the PTY (regular text fields use keyCode directly)
+        var delChar: UniChar = 0x7F
+        down.keyboardSetUnicodeString(stringLength: 1, unicodeString: &delChar)
+        // Strip modifier flags so terminals don't interpret this as Alt+Backspace
+        let modifiers: CGEventFlags = [.maskAlternate, .maskCommand, .maskControl, .maskShift]
+        down.flags = down.flags.subtracting(modifiers)
+        up.flags = up.flags.subtracting(modifiers)
+        down.post(tap: .cghidEventTap)
+        up.post(tap: .cghidEventTap)
     }
 
     func sendCopy() {
