@@ -18,7 +18,7 @@ final class TriggerKeyTests: XCTestCase {
     }
 
     func testAllCasesHasExpectedCount() {
-        XCTAssertEqual(TriggerKey.allCases.count, 4)
+        XCTAssertEqual(TriggerKey.allCases.count, 5)
     }
 
     func testDisplayNamesAreNonEmpty() {
@@ -108,6 +108,50 @@ final class TriggerKeyTests: XCTestCase {
         monitor.handleFlagsChanged(flags: [])
 
         XCTAssertFalse(triggered)
+    }
+
+    // MARK: - fn
+
+    func testFn_FnTriggers() {
+        monitor.triggerKey = .fn
+        var triggered = false
+        monitor.onSwitchTriggered = { _, _ in triggered = true }
+
+        monitor.handleFlagsChanged(flags: .maskSecondaryFn)
+        monitor.handleFlagsChanged(flags: [])
+
+        XCTAssertTrue(triggered)
+    }
+
+    func testFn_FnPlusKeyDoesNotTrigger() {
+        monitor.triggerKey = .fn
+        var triggered = false
+        monitor.onSwitchTriggered = { _, _ in triggered = true }
+
+        monitor.handleFlagsChanged(flags: .maskSecondaryFn)
+        monitor.handleKeyDown(VKey.a.rawValue, flags: .maskSecondaryFn)
+        monitor.handleFlagsChanged(flags: [])
+
+        XCTAssertFalse(triggered)
+    }
+
+    func testFn_OptionDoesNotTrigger() {
+        monitor.triggerKey = .fn
+        var triggered = false
+        monitor.onSwitchTriggered = { _, _ in triggered = true }
+
+        monitor.handleFlagsChanged(flags: .maskAlternate)
+        monitor.handleFlagsChanged(flags: [])
+
+        XCTAssertFalse(triggered)
+    }
+
+    func testFn_ReturnsFalse_NoSuppression() {
+        monitor.triggerKey = .fn
+        monitor.onSwitchTriggered = { _, _ in }
+
+        let suppress = monitor.handleFlagsChanged(flags: .maskSecondaryFn)
+        XCTAssertFalse(suppress)
     }
 
     // MARK: - Caps Lock
