@@ -54,9 +54,12 @@ Grant **Accessibility** permission on first launch:
 | Both Options ⌥ | Either Option key (default) |
 | Left Option ⌥ | Only left Option |
 | Right Option ⌥ | Only right Option |
+| fn 🌐 | The fn / Globe key |
 | Caps Lock ⇪ | Caps Lock acts as switcher, toggle suppressed |
 
 Setting persists across restarts.
+
+> **fn note:** macOS binds a single fn/Globe press to a system action (emoji picker or input-source switch). For a clean trigger, set **System Settings → Keyboard → Press 🌐 key to → Do Nothing**.
 
 ## Requirements
 

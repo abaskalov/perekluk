@@ -64,6 +64,7 @@ public enum TriggerKey: String, CaseIterable {
     case bothOptions = "bothOptions"
     case leftOption = "leftOption"
     case rightOption = "rightOption"
+    case fn = "fn"
     case capsLock = "capsLock"
 
     public var displayName: String {
@@ -71,6 +72,7 @@ public enum TriggerKey: String, CaseIterable {
         case .bothOptions:  return "Both Options ⌥"
         case .leftOption:   return "Left Option ⌥"
         case .rightOption:  return "Right Option ⌥"
+        case .fn:           return "fn 🌐"
         case .capsLock:     return "Caps Lock ⇪"
         }
     }

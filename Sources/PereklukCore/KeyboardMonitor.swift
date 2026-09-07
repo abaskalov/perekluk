@@ -155,6 +155,8 @@ public final class KeyboardMonitor {
             return flags.rawValue & TriggerKey.deviceRAltMask != 0
         case .bothOptions:
             return flags.contains(.maskAlternate)
+        case .fn:
+            return flags.contains(.maskSecondaryFn)
         case .capsLock:
             return flags.contains(.maskAlphaShift)
         }
