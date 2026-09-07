@@ -1,7 +1,7 @@
 .PHONY: build run app install uninstall clean dmg sign notarize release
 
 PRODUCT = Perekluk
-VERSION = 1.5.0
+VERSION = 1.6.0
 BUILD_DIR = .build/release
 APP_NAME = Perekluk.app
 APP_DIR = $(APP_NAME)/Contents
