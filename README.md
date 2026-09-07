@@ -59,7 +59,7 @@ Grant **Accessibility** permission on first launch:
 
 Setting persists across restarts.
 
-> **fn note:** macOS binds a single fn/Globe press to a system action (emoji picker or input-source switch). For a clean trigger, set **System Settings → Keyboard → Press 🌐 key to → Do Nothing**.
+> **fn note:** macOS binds a single fn/Globe press to a system action (emoji picker or input-source switch). For a clean trigger, set **System Settings → Keyboard → Press 🌐 key to → Do Nothing**. Perekluk warns about this when you pick fn and offers to open that setting.
 
 ## Requirements
 

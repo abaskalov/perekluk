@@ -99,6 +99,21 @@ public enum Settings {
     }
 }
 
+// MARK: - System Keyboard Settings
+
+public enum SystemKeyboardSettings {
+    private static let hiToolboxDomain = "com.apple.HIToolbox"
+    private static let fnUsageKey = "AppleFnUsageType"
+
+    /// "Press 🌐 key to" in System Settings > Keyboard. An absent value is the macOS
+    /// default, which switches the input source or opens the emoji picker on a lone press.
+    public static var globeKeyDoesNothing: Bool {
+        UserDefaults(suiteName: hiToolboxDomain)?.object(forKey: fnUsageKey) as? Int == 0
+    }
+
+    public static let keyboardSettingsURL = URL(string: "x-apple.systempreferences:com.apple.Keyboard-Settings.extension")!
+}
+
 // MARK: - Timing
 
 public enum Timing {

@@ -127,6 +127,25 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate 
                 item.state = (item.representedObject as? String == rawValue) ? .on : .off
             }
         }
+
+        if newKey == .fn && !SystemKeyboardSettings.globeKeyDoesNothing {
+            showGlobeKeyWarning()
+        }
+    }
+
+    /// macOS acts on a lone fn / 🌐 press itself (input source switch or emoji picker),
+    /// so the layout would be switched twice unless that action is turned off.
+    private func showGlobeKeyWarning() {
+        let alert = NSAlert()
+        alert.messageText = "Set the 🌐 key to Do Nothing"
+        alert.informativeText = "macOS also reacts to a single fn / 🌐 press, so the layout would be switched twice. "
+            + "In System Settings > Keyboard set \"Press 🌐 key to\" to Do Nothing."
+        alert.addButton(withTitle: "Open Keyboard Settings")
+        alert.addButton(withTitle: "Later")
+        NSApp.activate(ignoringOtherApps: true)
+        if alert.runModal() == .alertFirstButtonReturn {
+            NSWorkspace.shared.open(SystemKeyboardSettings.keyboardSettingsURL)
+        }
     }
 
     private func observeAppActivation() {
