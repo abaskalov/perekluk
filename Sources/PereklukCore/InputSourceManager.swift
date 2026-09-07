@@ -3,7 +3,9 @@ import AppKit
 
 public final class InputSourceManager: InputSourceManaging {
 
-    private var layoutCache: [String: UnsafePointer<UCKeyboardLayout>] = [:]
+    // Retains the CFData itself: TISGetInputSourceProperty returns memory owned by the
+    // input source, and a cached raw pointer would dangle once the source is released
+    private var layoutCache: [String: CFData] = [:]
 
     public init() {}
 
@@ -101,22 +103,21 @@ public final class InputSourceManager: InputSourceManaging {
     // MARK: - Key Translation
 
     public func getLayoutData(for source: TISInputSource) -> UnsafePointer<UCKeyboardLayout>? {
+        let data: CFData
         if let id = sourceId(for: source), let cached = layoutCache[id] {
-            return cached
+            data = cached
+        } else {
+            guard let ptr = TISGetInputSourceProperty(source, kTISPropertyUnicodeKeyLayoutData) else {
+                return nil
+            }
+            data = Unmanaged<CFData>.fromOpaque(ptr).takeUnretainedValue()
+            if let id = sourceId(for: source) {
+                layoutCache[id] = data
+            }
         }
 
-        guard let ptr = TISGetInputSourceProperty(source, kTISPropertyUnicodeKeyLayoutData) else {
-            return nil
-        }
-        let data = unsafeBitCast(ptr, to: CFData.self)
         guard let bytes = CFDataGetBytePtr(data) else { return nil }
-        let layout = UnsafeRawPointer(bytes).assumingMemoryBound(to: UCKeyboardLayout.self)
-
-        if let id = sourceId(for: source) {
-            layoutCache[id] = layout
-        }
-
-        return layout
+        return UnsafeRawPointer(bytes).assumingMemoryBound(to: UCKeyboardLayout.self)
     }
 
     public func convertText(_ text: String, fromSource: TISInputSource, toSource: TISInputSource) -> String? {
@@ -253,6 +254,15 @@ public final class InputSourceManager: InputSourceManaging {
     public func currentSourceId() -> String? {
         guard let source = getCurrentSource() else { return nil }
         return sourceId(for: source)
+    }
+
+    public func currentSourceLanguage() -> String? {
+        guard let source = getCurrentSource(),
+              let ptr = TISGetInputSourceProperty(source, kTISPropertyInputSourceLanguages) else {
+            return nil
+        }
+        let languages = Unmanaged<CFArray>.fromOpaque(ptr).takeUnretainedValue() as? [String]
+        return languages?.first
     }
 
     public func enabledSourceIds() -> [String] {

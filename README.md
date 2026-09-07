@@ -14,6 +14,7 @@ Free, open-source alternative to Punto Switcher and Caramba Switcher.
 - **3+ layouts** — works with any number of keyboard layouts, not just two
 - **Dead key support** — handles accented characters (é, ü, ñ) correctly
 - **Menu bar indicator** — shows current layout (Ру / En)
+- **Launch at login** — enabled automatically on first launch, toggle in the menu
 - **Minimal footprint** — no Dock icon, no windows, just a menu bar item
 
 ## Install
@@ -43,6 +44,7 @@ Grant **Accessibility** permission on first launch:
 | Switch layout | Press trigger key with nothing typed/selected |
 | Reverse | Press trigger key again |
 | Change trigger | Menu bar → Trigger Key → pick one |
+| Toggle autostart | Menu bar → Launch at Login |
 | Quit | Menu bar → Quit |
 
 ### Trigger key options

@@ -65,7 +65,10 @@ final class MockInputSourceManager: InputSourceManaging {
     var layoutDetections: [String: (fromId: String, toId: String)] = [:]
     var scoreResults: [(id: String, score: Int)] = []
 
+    var currentLanguage: String? = "en"
+
     func currentSourceId() -> String? { currentId }
+    func currentSourceLanguage() -> String? { currentLanguage }
     func enabledSourceIds() -> [String] { sources }
 
     func selectSource(_ id: String) {

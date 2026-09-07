@@ -33,11 +33,14 @@ public final class KeyboardMonitor {
 
     @discardableResult
     public func start() -> Bool {
+        if eventTap != nil { return true }
+
         let eventMask: CGEventMask =
             (1 << CGEventType.keyDown.rawValue) |
             (1 << CGEventType.flagsChanged.rawValue) |
             (1 << CGEventType.leftMouseDown.rawValue) |
-            (1 << CGEventType.rightMouseDown.rawValue)
+            (1 << CGEventType.rightMouseDown.rawValue) |
+            (1 << Self.systemDefinedEventType)
 
         let refcon = UnsafeMutableRawPointer(Unmanaged.passUnretained(self).toOpaque())
 
@@ -66,10 +69,13 @@ public final class KeyboardMonitor {
     public func handleKeyDown(_ keyCode: UInt16, flags: CGEventFlags) {
         if triggerDown {
             triggerAlone = false
+            // The typed char reached the screen but is not replayable — buffer no longer matches
+            clearBuffer()
             return
         }
 
-        if flags.contains(.maskCommand) || flags.contains(.maskControl) {
+        // Option-modified chars (•, ©, dead keys) can't be replayed from keycodes either
+        if flags.contains(.maskCommand) || flags.contains(.maskControl) || flags.contains(.maskAlternate) {
             clearBuffer()
             return
         }
@@ -108,12 +114,19 @@ public final class KeyboardMonitor {
         return handleModifierTrigger(flags: flags)
     }
 
+    // Modifiers that make an Option press part of a chord, not a trigger.
+    // maskAlphaShift excluded: it stays set the whole time Caps Lock is on.
+    private static let chordModifiers: CGEventFlags = [.maskShift, .maskCommand, .maskControl]
+
     private func handleModifierTrigger(flags: CGEventFlags) -> Bool {
         let pressed = isTriggerPressed(flags)
+        let chordActive = !flags.intersection(Self.chordModifiers).isEmpty
 
         if pressed && !triggerDown {
             triggerDown = true
-            triggerAlone = true
+            triggerAlone = !chordActive
+        } else if pressed && triggerDown && chordActive {
+            triggerAlone = false
         } else if !pressed && triggerDown {
             if triggerAlone {
                 let (word, trailing) = extractLastWord()
@@ -150,7 +163,9 @@ public final class KeyboardMonitor {
     private func resetTriggerState() {
         triggerDown = false
         triggerAlone = false
-        lastCapsLockState = false
+        // Seed from the real state: if Caps Lock is already on, the first press turns it
+        // off and would otherwise be swallowed by the != guard
+        lastCapsLockState = CGEventSource.flagsState(.combinedSessionState).contains(.maskAlphaShift)
     }
 
     // MARK: - Last Word Extraction (xneur "trailing delimiter skip" algorithm)
@@ -178,9 +193,26 @@ public final class KeyboardMonitor {
 
     public func handleMouseDown() {
         clearBuffer()
+        if triggerDown { triggerAlone = false }
+    }
+
+    /// Media/system keys (volume, brightness) arrive as NX_SYSDEFINED, not keyDown —
+    /// Option+VolumeUp must not read as a lone Option tap.
+    public func handleSystemKey() {
+        if triggerDown { triggerAlone = false }
+    }
+
+    /// While the tap was disabled keystrokes reached the screen unbuffered,
+    /// and the trigger release may have been missed entirely.
+    public func handleTapDisabled() {
+        clearBuffer()
+        resetTriggerState()
     }
 
     // MARK: - Key Constants
+
+    // NX_SYSDEFINED (media/system keys) — has no CGEventType case
+    static let systemDefinedEventType: UInt32 = 14
 
     private static let wordBoundaryKeys: Set<UInt16> = [
         VKey.return.rawValue,
@@ -202,6 +234,7 @@ private func eventTapCallback(
     let monitor = Unmanaged<KeyboardMonitor>.fromOpaque(refcon).takeUnretainedValue()
 
     if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
+        monitor.handleTapDisabled()
         if let tap = monitor.eventTap {
             CGEvent.tapEnable(tap: tap, enable: true)
         }
@@ -209,6 +242,11 @@ private func eventTapCallback(
     }
 
     if event.getIntegerValueField(.eventSourceUserData) == TextReplacer.markerUserData {
+        return Unmanaged.passUnretained(event)
+    }
+
+    if type.rawValue == KeyboardMonitor.systemDefinedEventType {
+        monitor.handleSystemKey()
         return Unmanaged.passUnretained(event)
     }
 

@@ -74,6 +74,17 @@ final class IntegrationTests: XCTestCase {
         }
     }
 
+    // MARK: - Status Label
+
+    func testStatusLabelDerivedFromLanguageNotSourceId() {
+        // "Belarusian" contains "us" — substring matching on the source ID mislabeled it "En"
+        XCTAssertEqual(AppDelegate.statusLabel(forLanguage: "ru"), "Ру")
+        XCTAssertEqual(AppDelegate.statusLabel(forLanguage: "en"), "En")
+        XCTAssertEqual(AppDelegate.statusLabel(forLanguage: "be"), "Be")
+        XCTAssertEqual(AppDelegate.statusLabel(forLanguage: "uk"), "Uk")
+        XCTAssertEqual(AppDelegate.statusLabel(forLanguage: "pt-BR"), "Pt")
+    }
+
     // MARK: - Buffer Switch E2E
 
     func testBufferSwitch_ConvertsWordAndSwitchesLayout() {
@@ -108,6 +119,36 @@ final class IntegrationTests: XCTestCase {
             XCTAssertEqual(self.mockReplacer.deletedCharCount, 0)
             XCTAssertEqual(self.mockReplacer.pasteCount, 0)
             XCTAssertNil(self.mockISM.selectedSourceId)
+        }
+    }
+
+    func testBufferSwitch_DeadKeys_DeletesProducedCharCount() {
+        // 2 keystrokes (dead ^ + e) produced a single "ê" on screen — delete 1 char, not 2
+        mockISM.keyStrokeConversions[usLayout] = "ê"
+        mockISM.keyStrokeConversions[ruLayout] = "хе"
+
+        delegate.handleSwitch(dummyKeyStrokes(2), trailingSpaces: 0)
+
+        waitForAsyncChain {
+            XCTAssertEqual(self.mockReplacer.deletedCharCount, 1)
+            XCTAssertEqual(self.fakePB.string(forType: .string), "хе")
+        }
+    }
+
+    func testSelectionSwitch_FileCopyInFinder_DoesNotPaste() {
+        // Cmd+C with a file selected puts file URLs on the pasteboard; pasting back would duplicate the file
+        mockAX.selectedText = nil
+        mockISM.textConversions["Report.pdf"] = "Кузщке.зва"
+        mockReplacer.onCopy = { [self] in
+            fakePB.setString("Report.pdf", forType: .string)
+            fakePB.setString("file:///Users/x/Report.pdf", forType: .fileURL)
+        }
+
+        delegate.handleSwitch([], trailingSpaces: 0)
+
+        waitForAsyncChain {
+            XCTAssertEqual(self.mockReplacer.pasteCount, 0)
+            XCTAssertEqual(self.mockISM.selectNextSourceCallCount, 1)
         }
     }
 

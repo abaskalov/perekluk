@@ -31,6 +31,9 @@ public protocol InputSourceManaging {
     /// Returns the ID of the currently active keyboard source.
     func currentSourceId() -> String?
 
+    /// Returns the primary BCP-47 language code of the active source (e.g. "ru", "en").
+    func currentSourceLanguage() -> String?
+
     /// Returns IDs of all enabled keyboard input sources.
     func enabledSourceIds() -> [String]
 

@@ -134,6 +134,83 @@ final class KeyboardMonitorTests: XCTestCase {
         XCTAssertFalse(monitor.triggerAlone)
     }
 
+    // MARK: - Buffer stays in sync with the screen
+
+    func testTypingWhileTriggerDownClearsBuffer() {
+        // Option+8 types "•" on screen but is not buffered — stale buffer would desync deletes
+        typeKeys([VKey.h, .e, .y])
+        monitor.handleFlagsChanged(flags: .maskAlternate)
+        monitor.handleKeyDown(VKey.eight.rawValue, flags: .maskAlternate)
+        monitor.handleFlagsChanged(flags: [])
+        XCTAssertTrue(monitor.buffer.isEmpty)
+    }
+
+    func testOptionModifiedKeyClearsBuffer() {
+        // With Caps Lock as trigger, Option-modified chars reach handleKeyDown unbuffered-able
+        monitor.triggerKey = .capsLock
+        typeKeys([VKey.h, .e, .y])
+        monitor.handleKeyDown(VKey.eight.rawValue, flags: .maskAlternate)
+        XCTAssertTrue(monitor.buffer.isEmpty)
+    }
+
+    // MARK: - Modifier chords do not fire the trigger
+
+    func testShiftPressedWhileOptionDownDoesNotTrigger() {
+        var triggered = false
+        monitor.onSwitchTriggered = { _, _ in triggered = true }
+
+        monitor.handleFlagsChanged(flags: .maskAlternate)
+        monitor.handleFlagsChanged(flags: [.maskAlternate, .maskShift])
+        monitor.handleFlagsChanged(flags: .maskShift)
+
+        XCTAssertFalse(triggered)
+    }
+
+    func testOptionPressedDuringShiftChordDoesNotTrigger() {
+        var triggered = false
+        monitor.onSwitchTriggered = { _, _ in triggered = true }
+
+        monitor.handleFlagsChanged(flags: .maskShift)
+        monitor.handleFlagsChanged(flags: [.maskAlternate, .maskShift])
+        monitor.handleFlagsChanged(flags: .maskShift)
+        monitor.handleFlagsChanged(flags: [])
+
+        XCTAssertFalse(triggered)
+    }
+
+    func testMouseClickWhileOptionDownDoesNotTrigger() {
+        // Option+click (open in new window, option-drag) is not a trigger tap
+        var triggered = false
+        monitor.onSwitchTriggered = { _, _ in triggered = true }
+
+        monitor.handleFlagsChanged(flags: .maskAlternate)
+        monitor.handleMouseDown()
+        monitor.handleFlagsChanged(flags: [])
+
+        XCTAssertFalse(triggered)
+    }
+
+    func testTapDisabledClearsBufferAndTriggerState() {
+        // While the tap was dead keystrokes reached the screen unbuffered — replaying
+        // a stale backspace count would eat wrong text
+        typeKeys([VKey.h, .e, .y])
+        monitor.handleFlagsChanged(flags: .maskAlternate)
+        monitor.handleTapDisabled()
+        XCTAssertTrue(monitor.buffer.isEmpty)
+        XCTAssertFalse(monitor.triggerDown)
+    }
+
+    func testCapsLockFlagDoesNotCancelTriggerAlone() {
+        // Caps Lock enabled while typing keeps maskAlphaShift set — must not break the trigger
+        var triggered = false
+        monitor.onSwitchTriggered = { _, _ in triggered = true }
+
+        monitor.handleFlagsChanged(flags: [.maskAlternate, .maskAlphaShift])
+        monitor.handleFlagsChanged(flags: .maskAlphaShift)
+
+        XCTAssertTrue(triggered)
+    }
+
     // MARK: - extractLastWord via handleFlagsChanged
 
     func testOptionTriggersCallbackWithWord() {

@@ -1,8 +1,10 @@
 import AppKit
 import Carbon
+import ServiceManagement
 
-public final class AppDelegate: NSObject, NSApplicationDelegate {
+public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var statusItem: NSStatusItem!
+    private var launchAtLoginItem: NSMenuItem?
     let keyboardMonitor = KeyboardMonitor()
     var inputSourceManager: InputSourceManaging = InputSourceManager()
     var textReplacer: TextReplacing = TextReplacer()
@@ -19,12 +21,9 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         observeAppActivation()
         updateStatusItemTitle()
         startUninstallWatcher()
+        registerLoginItemOnFirstLaunch()
 
-        if AXIsProcessTrusted() {
-            setupKeyboardMonitor()
-        } else {
-            requestAccessibilityAndWait()
-        }
+        setupKeyboardMonitor()
     }
 
     // MARK: - Accessibility
@@ -33,11 +32,12 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true]
         AXIsProcessTrustedWithOptions(options as CFDictionary)
 
+        // Poll by attempting the tap itself: AXIsProcessTrusted() can stay false
+        // in a running process after the grant on macOS 13+
         Timer.scheduledTimer(withTimeInterval: Timing.accessibilityCheckInterval, repeats: true) { [weak self] timer in
             guard let self else { timer.invalidate(); return }
-            if AXIsProcessTrusted() {
+            if self.keyboardMonitor.start() {
                 timer.invalidate()
-                self.setupKeyboardMonitor()
             }
         }
     }
@@ -58,9 +58,49 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         triggerItem.submenu = buildTriggerKeySubmenu()
         menu.addItem(triggerItem)
 
+        let loginItem = NSMenuItem(title: "Launch at Login", action: #selector(toggleLaunchAtLogin(_:)), keyEquivalent: "")
+        loginItem.target = self
+        loginItem.state = (SMAppService.mainApp.status == .enabled) ? .on : .off
+        menu.addItem(loginItem)
+        launchAtLoginItem = loginItem
+
         menu.addItem(.separator())
         menu.addItem(withTitle: "Quit", action: #selector(quit), keyEquivalent: "q")
+        menu.delegate = self
         statusItem.menu = menu
+    }
+
+    // MARK: - Launch at Login
+
+    private static let didRegisterLoginItemKey = "didRegisterLoginItem"
+
+    private func registerLoginItemOnFirstLaunch() {
+        guard !UserDefaults.standard.bool(forKey: Self.didRegisterLoginItemKey) else { return }
+        // No bundle (swift run) — SMAppService cannot register a bare executable
+        guard Bundle.main.bundleIdentifier != nil else { return }
+        // Translocated run (opened from DMG/Downloads) would record a random read-only path
+        guard !Bundle.main.bundlePath.contains("/AppTranslocation/") else { return }
+        do {
+            try SMAppService.mainApp.register()
+            UserDefaults.standard.set(true, forKey: Self.didRegisterLoginItemKey)
+        } catch {
+            // Retry on next launch (e.g. app translocated on first run from DMG)
+        }
+    }
+
+    @objc private func toggleLaunchAtLogin(_ sender: NSMenuItem) {
+        let service = SMAppService.mainApp
+        if service.status == .enabled {
+            try? service.unregister()
+        } else {
+            try? service.register()
+            // A manual toggle is an explicit choice — stop the first-launch auto-register
+            UserDefaults.standard.set(true, forKey: Self.didRegisterLoginItemKey)
+            if service.status == .requiresApproval {
+                SMAppService.openSystemSettingsLoginItems()
+            }
+        }
+        sender.state = (service.status == .enabled) ? .on : .off
     }
 
     private func buildTriggerKeySubmenu() -> NSMenu {
@@ -116,18 +156,12 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func updateStatusItemTitle() {
-        guard let sourceId = inputSourceManager.currentSourceId() else { return }
+        guard let language = inputSourceManager.currentSourceLanguage() else { return }
+        statusItem.button?.title = Self.statusLabel(forLanguage: language)
+    }
 
-        let label: String
-        if sourceId.localizedCaseInsensitiveContains("russian") {
-            label = "Ру"
-        } else if sourceId.localizedCaseInsensitiveContains("english") || sourceId.localizedCaseInsensitiveContains("us") {
-            label = "En"
-        } else {
-            label = String(sourceId.split(separator: ".").last?.prefix(2) ?? "??")
-        }
-
-        statusItem.button?.title = label
+    public static func statusLabel(forLanguage language: String) -> String {
+        language.hasPrefix("ru") ? "Ру" : String(language.prefix(2)).capitalized
     }
 
     @objc private func quit() {
@@ -148,6 +182,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
 
     public func applicationWillTerminate(_ notification: Notification) {
         guard !FileManager.default.fileExists(atPath: Bundle.main.bundlePath) else { return }
+        try? SMAppService.mainApp.unregister()
         let bundleId = Bundle.main.bundleIdentifier ?? "com.perekluk.app"
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/tccutil")
@@ -164,7 +199,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.handleSwitch(word, trailingSpaces: trailingSpaces)
         }
         if !keyboardMonitor.start() {
-            statusItem.button?.title = "⚠️"
+            requestAccessibilityAndWait()
         }
     }
 
@@ -186,11 +221,9 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    private var lastConvertedCharCount = 0
-
-    private func scheduleRestore(_ saved: [[(NSPasteboard.PasteboardType, Data)]]) {
+    private func scheduleRestore(_ saved: [[(NSPasteboard.PasteboardType, Data)]], afterCharCount charCount: Int) {
         let restoreChangeCount = pasteboard.changeCount
-        let delay = Timing.clipboardRestoreDelay(charCount: lastConvertedCharCount)
+        let delay = Timing.clipboardRestoreDelay(charCount: charCount)
         DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [self] in
             guard pasteboard.changeCount == restoreChangeCount else { return }
             guard !saved.isEmpty else { return }
@@ -218,9 +251,13 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
             newText += String(repeating: " ", count: trailingSpaces)
         }
 
-        let deleteCount = buffer.count + trailingSpaces
+        // Dead keys compose: N keystrokes may have produced fewer on-screen characters,
+        // so count what the current layout rendered, not the keystrokes
+        let typedText = inputSourceManager.convertKeyStrokes(
+            buffer, fromSourceId: currentId, toSourceId: currentId
+        )
+        let deleteCount = (typedText?.count ?? buffer.count) + trailingSpaces
         let saved = savePasteboard()
-        lastConvertedCharCount = deleteCount
         let deleteDelay = Timing.deleteDelay(charCount: deleteCount)
 
         DispatchQueue.main.asyncAfter(deadline: .now() + deleteDelay) { [self] in
@@ -231,7 +268,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
                 pasteboard.setString(newText, forType: .string)
                 textReplacer.sendPaste()
                 inputSourceManager.selectSource(otherId)
-                scheduleRestore(saved)
+                scheduleRestore(saved, afterCharCount: deleteCount)
             }
         }
     }
@@ -247,7 +284,13 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
             textReplacer.sendCopy()
 
             pollPasteboard(savedChangeCount: savedChangeCount) { [self] selectedText in
-                guard let selectedText, !selectedText.isEmpty else {
+                // Cmd+C in Finder & co. copies files, not text; converting and pasting
+                // the name back would duplicate the file into the folder
+                let copiedFiles = pasteboard.string(forType: .fileURL) != nil
+                guard let selectedText, !selectedText.isEmpty, !copiedFiles else {
+                    if pasteboard.changeCount != savedChangeCount {
+                        scheduleRestore(saved, afterCharCount: 0)
+                    }
                     inputSourceManager.selectNextSource()
                     return
                 }
@@ -294,8 +337,6 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
 
-        lastConvertedCharCount = converted.count
-
         if !usedClipboard && accessibilityReader.setSelectedText(converted) {
             if toId != currentId {
                 inputSourceManager.selectSource(toId)
@@ -310,9 +351,16 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
             }
 
             if usedClipboard {
-                scheduleRestore(savedClipboard)
+                scheduleRestore(savedClipboard, afterCharCount: converted.count)
             }
         }
+    }
+
+    // MARK: - NSMenuDelegate
+
+    public func menuWillOpen(_ menu: NSMenu) {
+        // Login item state can change outside the app (System Settings, approval flow)
+        launchAtLoginItem?.state = (SMAppService.mainApp.status == .enabled) ? .on : .off
     }
 
     private func pollPasteboard(
