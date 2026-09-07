@@ -1,6 +1,7 @@
 .PHONY: build run app install uninstall clean dmg sign notarize release
 
 PRODUCT = Perekluk
+VERSION = 1.5.0
 BUILD_DIR = .build/release
 APP_NAME = Perekluk.app
 APP_DIR = $(APP_NAME)/Contents
@@ -24,8 +25,8 @@ app: build
 		-c "Add :CFBundleIdentifier string com.perekluk.app" \
 		-c "Add :CFBundleName string Perekluk" \
 		-c "Add :CFBundlePackageType string APPL" \
-		-c "Add :CFBundleVersion string 1.0" \
-		-c "Add :CFBundleShortVersionString string 1.0" \
+		-c "Add :CFBundleVersion string $(VERSION)" \
+		-c "Add :CFBundleShortVersionString string $(VERSION)" \
 		-c "Add :CFBundleIconFile string AppIcon" \
 		-c "Add :LSUIElement bool true" \
 		-c "Add :NSHighResolutionCapable bool true" \
