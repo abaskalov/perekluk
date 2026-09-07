@@ -16,10 +16,9 @@ extension NSPasteboard: PasteboardProviding {}
 
 // MARK: - TextReplacing
 
-/// Abstracts simulated keyboard events (backspace, copy, paste) for testability.
+/// Abstracts simulated keyboard events (backspace, paste) for testability.
 public protocol TextReplacing {
     func deleteChars(count: Int)
-    func sendCopy()
     func sendPaste()
 }
 

@@ -31,10 +31,6 @@ public final class TextReplacer: TextReplacing {
         up.post(tap: .cghidEventTap)
     }
 
-    public func sendCopy() {
-        postKeyCombo(code: VKey.c.rawValue, command: true)
-    }
-
     public func sendPaste() {
         postKeyCombo(code: VKey.v.rawValue, command: true)
     }

@@ -300,10 +300,13 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate 
         } else {
             let savedChangeCount = pasteboard.changeCount
             let saved = savePasteboard()
-            textReplacer.sendCopy()
+            guard accessibilityReader.performCopy() else {
+                inputSourceManager.selectNextSource()
+                return
+            }
 
             pollPasteboard(savedChangeCount: savedChangeCount) { [self] selectedText in
-                // Cmd+C in Finder & co. copies files, not text; converting and pasting
+                // Copy in Finder & co. copies files, not text; converting and pasting
                 // the name back would duplicate the file into the folder
                 let copiedFiles = pasteboard.string(forType: .fileURL) != nil
                 guard let selectedText, !selectedText.isEmpty, !copiedFiles else {

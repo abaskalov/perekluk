@@ -136,10 +136,11 @@ final class IntegrationTests: XCTestCase {
     }
 
     func testSelectionSwitch_FileCopyInFinder_DoesNotPaste() {
-        // Cmd+C with a file selected puts file URLs on the pasteboard; pasting back would duplicate the file
+        // Copy with a file selected puts file URLs on the pasteboard; pasting back would duplicate the file
         mockAX.selectedText = nil
         mockISM.textConversions["Report.pdf"] = "Кузщке.зва"
-        mockReplacer.onCopy = { [self] in
+        mockAX.copyResult = true
+        mockAX.onCopy = { [self] in
             fakePB.setString("Report.pdf", forType: .string)
             fakePB.setString("file:///Users/x/Report.pdf", forType: .fileURL)
         }
@@ -176,7 +177,7 @@ final class IntegrationTests: XCTestCase {
         // AX path is synchronous
         XCTAssertEqual(mockAX.setText, "привет")
         XCTAssertEqual(mockReplacer.pasteCount, 0)
-        XCTAssertEqual(mockReplacer.copyCount, 0)
+        XCTAssertEqual(mockAX.copyCount, 0)
         XCTAssertEqual(mockISM.selectedSourceId, ruLayout)
     }
 
@@ -212,12 +213,10 @@ final class IntegrationTests: XCTestCase {
 
         delegate.handleSwitch([], trailingSpaces: 0)
 
-        // AX nil → clipboard path → poll exhausts → selectNextSource
-        waitForAsyncChain {
-            XCTAssertEqual(self.mockISM.selectNextSourceCallCount, 1)
-            XCTAssertEqual(self.mockReplacer.copyCount, 1)
-            XCTAssertEqual(self.mockReplacer.pasteCount, 0)
-        }
+        // AX nil → Copy menu item disabled → no clipboard round trip, straight to selectNextSource
+        XCTAssertEqual(mockAX.copyCount, 1)
+        XCTAssertEqual(mockISM.selectNextSourceCallCount, 1)
+        XCTAssertEqual(mockReplacer.pasteCount, 0)
     }
 
     func testSelectionSwitch_AXReturnsEmpty_FallsToClipboard() {
@@ -225,9 +224,20 @@ final class IntegrationTests: XCTestCase {
 
         delegate.handleSwitch([], trailingSpaces: 0)
 
+        XCTAssertEqual(mockAX.copyCount, 1)
+        XCTAssertEqual(mockISM.selectNextSourceCallCount, 1)
+    }
+
+    func testSelectionSwitch_CopyEnabledButNothingCopied_JustSwitches() {
+        mockAX.selectedText = nil
+        mockAX.copyResult = true
+
+        delegate.handleSwitch([], trailingSpaces: 0)
+
+        // Copy item enabled but the app put nothing on the pasteboard → poll exhausts → selectNextSource
         waitForAsyncChain {
             XCTAssertEqual(self.mockISM.selectNextSourceCallCount, 1)
-            XCTAssertEqual(self.mockReplacer.copyCount, 1)
+            XCTAssertEqual(self.mockReplacer.pasteCount, 0)
         }
     }
 
@@ -238,8 +248,9 @@ final class IntegrationTests: XCTestCase {
         mockISM.layoutDetections["ghbdtn"] = (fromId: usLayout, toId: ruLayout)
         mockISM.textConversions["ghbdtn"] = "привет"
 
-        // Simulate Cmd+C putting text on clipboard
-        mockReplacer.onCopy = { [self] in
+        // Simulate the Copy menu action putting text on clipboard
+        mockAX.copyResult = true
+        mockAX.onCopy = { [self] in
             fakePB.clearContents()
             fakePB.setString("ghbdtn", forType: .string)
         }
@@ -247,7 +258,7 @@ final class IntegrationTests: XCTestCase {
         delegate.handleSwitch([], trailingSpaces: 0)
 
         waitForAsyncChain {
-            XCTAssertEqual(self.mockReplacer.copyCount, 1)
+            XCTAssertEqual(self.mockAX.copyCount, 1)
             XCTAssertEqual(self.mockReplacer.pasteCount, 1)
             XCTAssertEqual(self.fakePB.string(forType: .string), "привет")
             XCTAssertEqual(self.mockISM.selectedSourceId, self.ruLayout)
@@ -257,7 +268,8 @@ final class IntegrationTests: XCTestCase {
     func testSelectionSwitch_ClipboardPath_NoConversion_JustSwitches() {
         mockAX.selectedText = nil
 
-        mockReplacer.onCopy = { [self] in
+        mockAX.copyResult = true
+        mockAX.onCopy = { [self] in
             fakePB.clearContents()
             fakePB.setString("12345", forType: .string)
         }

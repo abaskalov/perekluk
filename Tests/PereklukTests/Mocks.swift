@@ -31,13 +31,10 @@ final class FakePasteboard: PasteboardProviding {
 
 final class MockTextReplacer: TextReplacing {
     var deletedCharCount = 0
-    var copyCount = 0
     var pasteCount = 0
-    var onCopy: (() -> Void)?
     var onPaste: (() -> Void)?
 
     func deleteChars(count: Int) { deletedCharCount += count }
-    func sendCopy() { copyCount += 1; onCopy?() }
     func sendPaste() { pasteCount += 1; onPaste?() }
 }
 
@@ -45,12 +42,21 @@ final class MockAccessibilityReader: AccessibilityReading {
     var selectedText: String?
     var setText: String?
     var setTextResult = false
+    var copyResult = false
+    var copyCount = 0
+    var onCopy: (() -> Void)?
 
     func getSelectedText() -> String? { selectedText }
 
     func setSelectedText(_ text: String) -> Bool {
         setText = text
         return setTextResult
+    }
+
+    func performCopy() -> Bool {
+        copyCount += 1
+        onCopy?()
+        return copyResult
     }
 }
 

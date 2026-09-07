@@ -129,10 +129,8 @@ final class ProtocolTests: XCTestCase {
     func testMockTextReplacerTracksActions() {
         let mock = MockTextReplacer()
         mock.deleteChars(count: 5)
-        mock.sendCopy()
         mock.sendPaste()
         XCTAssertEqual(mock.deletedCharCount, 5)
-        XCTAssertEqual(mock.copyCount, 1)
         XCTAssertEqual(mock.pasteCount, 1)
     }
 

@@ -68,7 +68,7 @@ Setting persists across restarts.
 
 ## How it works
 
-Perekluk installs a global event tap to buffer keystrokes. On trigger, it deletes the buffered word and retypes it in the target layout using `UCKeyTranslate` with stateful dead key handling. For selections, it reads text via Accessibility API (falling back to clipboard), converts it, and writes it back.
+Perekluk installs a global event tap to buffer keystrokes. On trigger, it deletes the buffered word and retypes it in the target layout using `UCKeyTranslate` with stateful dead key handling. For selections, it reads text via Accessibility API (falling back to the app's Copy menu action and the clipboard; no synthetic Cmd+C, which Ghostty would type as a stray "c"), converts it, and writes it back.
 
 ## License
 
